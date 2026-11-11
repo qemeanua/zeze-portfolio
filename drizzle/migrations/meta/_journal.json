@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794386234001,
+      "tag": "0000_secure_portfolio_cms_and_cv_content",
+      "breakpoints": true
+    }
+  ]
 }
