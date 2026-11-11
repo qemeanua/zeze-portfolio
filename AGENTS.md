@@ -28,3 +28,7 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Portfolio content architecture
+
+- Keep this single-owner portfolio's editable, public content in one migration-seeded JSONB document; enforce visitor-read and administrator-write access with database policies and an administrator role granted only after the verified contact email is confirmed, so content persists without exposing dashboard writes.
