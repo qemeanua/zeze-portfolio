@@ -51,9 +51,15 @@ export interface EducationEntry extends PortfolioEntry {
 
 export interface ProjectEntry extends PortfolioEntry {
   title: string;
+  slug?: string;
   category: string;
   description: string;
+  fullDescription?: string;
+  problem?: string;
+  features?: string[];
+  screenshots?: string[];
   technologies: string;
+  learnings?: string;
   imageUrl: string;
   projectUrl: string;
   githubUrl: string;
