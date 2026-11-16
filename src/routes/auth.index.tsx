@@ -33,7 +33,7 @@ function getAuthErrorMessage(error: unknown, mode: "sign-in" | "sign-up") {
 }
 
 function getEmailRedirectTo() {
-  return import.meta.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`;
+  return import.meta.env["NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL"] || `${window.location.origin}/auth/callback`;
 }
 
 function AuthPage() {
@@ -47,10 +47,6 @@ function AuthPage() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedEmail = email.trim().toLowerCase();
-    if (trimmedEmail !== "ezinne.emm@gmail.com") {
-      toast.error("This private portfolio is managed by its owner.");
-      return;
-    }
     if (password.length < 8 || password.length > 128) {
       toast.error("Use a password between 8 and 128 characters.");
       return;
@@ -86,10 +82,6 @@ function AuthPage() {
 
   async function resendConfirmation() {
     const trimmedEmail = email.trim().toLowerCase();
-    if (trimmedEmail !== "ezinne.emm@gmail.com") {
-      toast.error("This private portfolio is managed by its owner.");
-      return;
-    }
     setBusy(true);
     try {
       const { error } = await supabase.auth.resend({
@@ -109,11 +101,21 @@ function AuthPage() {
   async function social(provider: "google" | "lovable") {
     setBusy(true);
     try {
-      const result = await lovable.auth.signInWithOAuth(provider, { redirect_uri: window.location.origin + "/admin" });
+      if (provider === "google") {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: { redirectTo: getEmailRedirectTo() },
+        });
+        if (error) throw error;
+        return;
+      }
+
+      const result = await lovable.auth.signInWithOAuth("lovable", { redirect_uri: getEmailRedirectTo() });
       if (result.error) throw result.error;
       if (!result.redirected) await navigate({ to: "/admin" });
     } catch (error) {
       toast.error(getAuthErrorMessage(error, "sign-in"));
+    } finally {
       setBusy(false);
     }
   }
@@ -131,17 +133,17 @@ function AuthPage() {
           <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground lg:hidden"><ArrowLeft className="size-4" /> Back to portfolio</Link>
           <div className="mb-8 mt-12 size-14 rounded-2xl bg-primary/10 p-4 text-primary lg:mt-0"><LockKeyhole className="size-6" /></div>
           {checkEmail ? <><p className="font-mono text-xs uppercase tracking-[.2em] text-rose">Registration</p><h2 className="mt-3 editorial-title text-5xl">Check your inbox.</h2><p className="mt-5 leading-7 text-muted-foreground">Use the confirmation link sent to your email address, then return here to manage the portfolio.</p><div className="mt-7 flex flex-wrap gap-3"><Button type="button" variant="outline" className="rounded-full" disabled={busy} onClick={() => void resendConfirmation()}>{busy ? <LoaderCircle className="animate-spin" /> : <Mail />}Resend confirmation email</Button><Button asChild variant="ghost" className="rounded-full"><Link to="/auth">Return to sign in</Link></Button></div></> : <>
-            <p className="font-mono text-xs uppercase tracking-[.2em] text-rose">Owner access</p><h2 className="mt-3 editorial-title text-5xl">{mode === "sign-in" ? "Welcome back." : "Your private workspace."}</h2><p className="mt-4 leading-7 text-muted-foreground">Only the confirmed portfolio owner can edit this website.</p>
+            <p className="font-mono text-xs uppercase tracking-[.2em] text-rose">Editor access</p><h2 className="mt-3 editorial-title text-5xl">{mode === "sign-in" ? "Welcome back." : "Your private workspace."}</h2><p className="mt-4 leading-7 text-muted-foreground">Sign in with your email or Google account. The portfolio owner can grant editor access to additional accounts.</p>
             <form onSubmit={submit} className="mt-8 space-y-4">
-              <label className="block text-sm font-medium" htmlFor="owner-email">Owner email</label>
+              <label className="block text-sm font-medium" htmlFor="owner-email">Email address</label>
               <Input id="owner-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required maxLength={254} placeholder="Your email address" />
               <label className="block text-sm font-medium" htmlFor="owner-password">Password</label>
               <Input id="owner-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "sign-in" ? "current-password" : "new-password"} required minLength={8} maxLength={128} placeholder="At least 8 characters" />
-              <Button type="submit" className="h-11 w-full rounded-full" disabled={busy}>{busy ? <LoaderCircle className="animate-spin" /> : mode === "sign-in" ? <LockKeyhole /> : <Mail />}{mode === "sign-in" ? "Sign in securely" : "Create owner account"}</Button>
+              <Button type="submit" className="h-11 w-full rounded-full" disabled={busy}>{busy ? <LoaderCircle className="animate-spin" /> : mode === "sign-in" ? <LockKeyhole /> : <Mail />}{mode === "sign-in" ? "Sign in securely" : "Create account"}</Button>
             </form>
             <div className="my-5 flex items-center gap-3"><span className="h-px flex-1 bg-border" /><span className="font-mono text-[10px] uppercase text-muted-foreground">or continue with</span><span className="h-px flex-1 bg-border" /></div>
             <div className="grid grid-cols-2 gap-3"><Button type="button" variant="outline" className="rounded-full" disabled={busy} onClick={() => void social("google")}>Continue with Google</Button><Button type="button" variant="outline" className="rounded-full" disabled={busy} onClick={() => void social("lovable")}>Continue with Lovable</Button></div>
-            <p className="mt-5 text-center text-sm text-muted-foreground">{mode === "sign-in" ? "New owner?" : "Already registered?"} <button type="button" className="font-semibold text-rose underline underline-offset-4" onClick={() => setMode(mode === "sign-in" ? "sign-up" : "sign-in")}>{mode === "sign-in" ? "Create your account" : "Sign in"}</button></p>
+            <p className="mt-5 text-center text-sm text-muted-foreground">{mode === "sign-in" ? "New editor?" : "Already registered?"} <button type="button" className="font-semibold text-rose underline underline-offset-4" onClick={() => setMode(mode === "sign-in" ? "sign-up" : "sign-in")}>{mode === "sign-in" ? "Create your account" : "Sign in"}</button></p>
           </>}
         </div>
       </section>
