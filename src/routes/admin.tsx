@@ -187,14 +187,14 @@ function Field({ label, children }: FieldProps) { return <div className="space-y
 const fieldsByCollection: Record<Exclude<SectionKey,"overview"|"profile"|"appearance"|"skillCategories">, string[]> = {
   experiences: ["role","company","dates","location","responsibilities"],
   education: ["degree","institution","dates","location","details"],
-  projects: ["title","category","description","technologies","imageUrl","projectUrl","githubUrl","featured","published"],
+  projects: ["title","slug","category","description","fullDescription","problem","features","screenshots","technologies","learnings","imageUrl","projectUrl","githubUrl","featured","published"],
   achievements: ["title","detail","year"],
   tools: ["name","category","icon"],
 };
 const templates: Partial<Record<PortfolioCollectionName, PortfolioEntry>> = {
   experiences: { role:"",company:"",dates:"",location:"",responsibilities:[] },
   education: { degree:"",institution:"",dates:"",location:"",details:[] },
-  projects: { title:"",category:"Project",description:"",technologies:"",imageUrl:"",projectUrl:"",githubUrl:"",featured:false,published:true },
+  projects: { title:"",slug:"",category:"Project",description:"",fullDescription:"",problem:"",features:[],screenshots:[],technologies:"",learnings:"",imageUrl:"",projectUrl:"",githubUrl:"",featured:false,published:true },
   achievements: { title:"",detail:"",year:"" },
   tools: { name:"",category:"Development",icon:"Wrench" },
 };
@@ -216,13 +216,64 @@ function CollectionEditor({ collection, entries, saving, onSave }: { collection:
     <SaveBar saving={saving} onSave={() => onSave(draft)} /></div>;
 }
 
+async function compressProjectScreenshot(file: File) {
+  const image = await createImageBitmap(file);
+  const scale = Math.min(1, 1800 / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(image.width * scale);
+  canvas.height = Math.round(image.height * scale);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("This screenshot could not be prepared.");
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close();
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("This screenshot could not be prepared.")), "image/webp", 0.84));
+  return new File([blob], "project-screenshot.webp", { type: "image/webp" });
+}
+
 function EntryField({ field, value, onChange }: { field: string; value: PortfolioEntry[string]; onChange: (value: string | boolean | string[]) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const fieldId = `project-${field}`;
+
+  async function uploadScreenshot(file: File | undefined) {
+    if (!file) return;
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) { toast.error("Use a JPG, PNG, or WebP screenshot."); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.error("Choose a screenshot under 8 MB."); return; }
+    const currentScreenshots = Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    if (currentScreenshots.length >= 40) { toast.error("A project can have up to 40 screenshots."); return; }
+
+    setUploading(true);
+    try {
+      const optimizedFile = await compressProjectScreenshot(file);
+      const path = `projects/${crypto.randomUUID()}.webp`;
+      const { error } = await supabase.storage.from("portfolio-media").upload(path, optimizedFile, {
+        contentType: "image/webp",
+        cacheControl: "31536000",
+        upsert: false,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from("portfolio-media").getPublicUrl(path);
+      onChange([...currentScreenshots, data.publicUrl]);
+      toast.success("Screenshot uploaded. Save changes to publish it.");
+    } catch {
+      toast.error("The screenshot could not be uploaded. Check that you are signed in as the portfolio owner.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   if (typeof value === "boolean") return <label className="flex items-center gap-3 rounded-xl border border-border p-3 text-sm"><input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} className="size-4 accent-rose" />{formatLabel(field)}</label>;
-  if (Array.isArray(value)) return <div className="space-y-2 sm:col-span-2"><Label>{formatLabel(field)} · one item per line</Label><Textarea rows={Math.min(10,Math.max(4,value.length))} value={value.join("\n")} onChange={(e) => onChange(e.target.value.split("\n").slice(0,40))} /></div>;
-  if (["description"].includes(field)) return <div className="space-y-2 sm:col-span-2"><Label>{formatLabel(field)}</Label><Textarea required rows={4} maxLength={3000} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} /></div>;
-  if (["imageUrl"].includes(field)) return <div className="space-y-2 sm:col-span-2"><Label>{formatLabel(field)}</Label><Input maxLength={1000} type="url" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} placeholder="Optional public image link" /><p className="text-xs text-muted-foreground">A URL you provide; this form does not invent project images.</p></div>;
+  if (Array.isArray(value)) return <div className="space-y-2 sm:col-span-2"><Label htmlFor={fieldId}>{field === "screenshots" ? "Screenshots · one image per line" : `${formatLabel(field)} · one item per line`}</Label><Textarea id={fieldId} rows={Math.min(10,Math.max(4,value.length))} maxLength={field === "screenshots" ? 24000 : 8000} value={value.join("\n")} disabled={field === "screenshots" && uploading} onChange={(e) => onChange(e.target.value.split("\n").map((item) => item.trim()).filter(Boolean).slice(0,40))} placeholder={field === "screenshots" ? "https://… or /images/project-screen.webp" : undefined} />{field === "screenshots" && <><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-muted-foreground">Upload an image or paste a public URL. Up to 40 screenshots.</p><label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border px-4 py-2 text-sm transition hover:bg-muted"><FileImage className="size-4" />{uploading ? "Uploading…" : "Upload screenshot"}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload project screenshot" disabled={uploading} onChange={(event) => { void uploadScreenshot(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label></div><div className="grid gap-3 sm:grid-cols-3">{value.filter((url): url is string => typeof url === "string" && isSafeImageSource(url)).map((url, index) => <img key={`${url}-${index}`} src={url} alt={`Project screenshot ${index + 1}`} loading="lazy" className="aspect-video w-full rounded-xl border border-border object-cover" />)}</div></>}</div>;
+  if (["description","fullDescription","problem","learnings"].includes(field)) return <div className="space-y-2 sm:col-span-2"><Label htmlFor={fieldId}>{field === "problem" ? "Problem solved" : field === "learnings" ? "What I learned" : formatLabel(field)}</Label><Textarea id={fieldId} required={field === "description"} rows={field === "description" ? 4 : 6} maxLength={field === "description" ? 3000 : 12000} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} /></div>;
+  if (["imageUrl"].includes(field)) return <div className="space-y-2 sm:col-span-2"><Label htmlFor={fieldId}>{formatLabel(field)}</Label><Input id={fieldId} maxLength={1000} type="url" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} placeholder="Optional public image link" /><p className="text-xs text-muted-foreground">A URL you provide; this form does not invent project images.</p></div>;
   const type = field.toLowerCase().endsWith("url") ? "url" : "text";
-  return <div className="space-y-2"><Label>{formatLabel(field)}</Label><Input maxLength={field.toLowerCase().includes("url") ? 1000 : 500} type={type} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} /></div>;
+  return <div className="space-y-2"><Label htmlFor={fieldId}>{formatLabel(field)}</Label><Input id={fieldId} maxLength={field.toLowerCase().includes("url") ? 1000 : 500} type={type} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} /></div>;
+}
+
+function isSafeImageSource(value: string) {
+  if (value.startsWith("/")) return true;
+  try { return new URL(value).protocol === "https:"; }
+  catch { return false; }
 }
 function formatLabel(key: string) { return key.replace(/([A-Z])/g," $1").replace(/^./, (s)=>s.toUpperCase()); }
 function firstString(row: PortfolioEntry,key:string):string { return typeof row[key] === "string" ? row[key] as string : ""; }
