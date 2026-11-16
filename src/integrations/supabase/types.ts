@@ -89,6 +89,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      invite_portfolio_admin: {
+        Args: {
+          target_email: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"

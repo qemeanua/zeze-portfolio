@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, BriefcaseBusiness, Check, ChevronRight, FileImage, FileText, FolderKanban, GraduationCap, ImagePlus, LayoutDashboard, LoaderCircle, LogOut, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2, UserRound, Wrench } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, BriefcaseBusiness, Check, ChevronRight, FileImage, FileText, FolderKanban, GraduationCap, ImagePlus, LayoutDashboard, LoaderCircle, LogOut, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2, UserPlus, UserRound, UsersRound, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
 import { PortfolioIcon } from "@/components/portfolio/icons";
@@ -34,8 +34,10 @@ const navItems = [
   { key: "achievements", label: "Achievements", icon: ShieldCheck },
   { key: "tools", label: "Tools", icon: Wrench },
   { key: "appearance", label: "Appearance", icon: Settings2 },
+  { key: "editors", label: "Editors", icon: UsersRound },
 ] as const;
 type SectionKey = (typeof navItems)[number]["key"];
+type CollectionSectionKey = Exclude<SectionKey, "overview" | "profile" | "appearance" | "skillCategories" | "editors">;
 
 function AdminPage() {
   const [email, setEmail] = useState<string | null>(null);
@@ -97,7 +99,7 @@ function AdminPage() {
   async function signOut() { await supabase.auth.signOut(); }
 
   if (!ready) return <div className="grid min-h-screen place-items-center bg-background"><LoaderCircle className="size-7 animate-spin text-rose" /></div>;
-  if (!isAdmin) return <main className="grid min-h-screen place-items-center bg-background px-5"><div className="w-full max-w-lg rounded-3xl border border-border bg-card p-8 text-center"><div className="mx-auto grid size-14 place-items-center rounded-full bg-blush text-rose"><ShieldCheck /></div><h1 className="mt-6 editorial-title text-5xl">{email ? "Owner access only." : "Your private workspace."}</h1><p className="mt-4 leading-7 text-muted-foreground">{email ? "This account does not have portfolio administrator access. Sign in with the verified owner account to continue." : "Sign in or create your owner account to manage your portfolio."}</p><div className="mt-7 flex justify-center gap-3">{email && <Button variant="outline" className="rounded-full" onClick={() => void signOut()}><LogOut />Sign out</Button>}<Button asChild className="rounded-full"><Link to="/auth">Go to sign in<ChevronRight /></Link></Button></div><Link to="/" className="mt-6 inline-block text-sm text-muted-foreground underline underline-offset-4">Back to portfolio</Link></div></main>;
+  if (!isAdmin) return <main className="grid min-h-screen place-items-center bg-background px-5"><div className="w-full max-w-lg rounded-3xl border border-border bg-card p-8 text-center"><div className="mx-auto grid size-14 place-items-center rounded-full bg-blush text-rose"><ShieldCheck /></div><h1 className="mt-6 editorial-title text-5xl">{email ? "Editor access only." : "Your private workspace."}</h1><p className="mt-4 leading-7 text-muted-foreground">{email ? "This account does not have editor access yet. Ask a portfolio administrator to grant access to this email, then sign out and sign in again." : "Sign in with an invited email account to manage the portfolio."}</p><div className="mt-7 flex justify-center gap-3">{email && <Button variant="outline" className="rounded-full" onClick={() => void signOut()}><LogOut />Sign out</Button>}<Button asChild className="rounded-full"><Link to="/auth">Go to sign in<ChevronRight /></Link></Button></div><Link to="/" className="mt-6 inline-block text-sm text-muted-foreground underline underline-offset-4">Back to portfolio</Link></div></main>;
 
   if (!content) return <main className="grid min-h-screen place-items-center"><div className="text-center"><p>Portfolio content could not be loaded.</p><Button className="mt-3" onClick={() => void loadContent().catch(() => toast.error("Please try again."))}>Try again</Button></div></main>;
 
@@ -115,18 +117,61 @@ function AdminPage() {
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur-lg sm:px-8"><div className="flex items-center gap-3"><Button variant="outline" size="icon" className="lg:hidden" aria-label="Open menu" onClick={() => setMobileNav(true)}>☰</Button><span className="font-mono text-[10px] uppercase tracking-[.2em] text-rose">Portfolio studio</span><span className="hidden text-muted-foreground sm:inline">/</span><span className="hidden text-sm font-medium sm:inline">{activeLabel}</span></div><Button asChild variant="outline" size="sm" className="rounded-full"><Link to="/">View website<ArrowRightSmall /></Link></Button></header>
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10">
         <div className="mb-8"><p className="font-mono text-xs uppercase tracking-[.2em] text-rose">Queen-Esther Ezinne Emeanua</p><h1 className="mt-2 editorial-title text-5xl">{section === "overview" ? "Your portfolio, thoughtfully." : `Edit ${activeLabel.toLowerCase()}.`}</h1><p className="mt-3 text-sm text-muted-foreground">Your changes appear on the public website when saved.</p></div>
-        {section === "overview" ? <Overview counts={counts} onSelect={setSection} content={content} /> : section === "profile" ? <ProfileEditor profile={content.profile} saving={saving} onSave={(profile) => void persist({ ...content, profile })} /> : section === "appearance" ? <AppearanceEditor content={content} saving={saving} onSave={(next) => void persist(next)} /> : section === "skillCategories" ? <SkillsEditor categories={content.skillCategories} saving={saving} onSave={(skillCategories) => void persist({ ...content, skillCategories })} /> : <CollectionEditor key={section} collection={section} entries={content[section as PortfolioCollectionName] as PortfolioEntry[]} saving={saving} onSave={(entries) => void persist({ ...content, [section]: entries } as PortfolioContent)} />}
+        {section === "overview" ? <Overview counts={counts} onSelect={setSection} content={content} /> : section === "profile" ? <ProfileEditor profile={content.profile} saving={saving} onSave={(profile) => void persist({ ...content, profile })} /> : section === "appearance" ? <AppearanceEditor content={content} saving={saving} onSave={(next) => void persist(next)} /> : section === "editors" ? <EditorAccessForm /> : section === "skillCategories" ? <SkillsEditor categories={content.skillCategories} saving={saving} onSave={(skillCategories) => void persist({ ...content, skillCategories })} /> : <CollectionEditor key={section} collection={section} entries={content[section as PortfolioCollectionName] as PortfolioEntry[]} saving={saving} onSave={(entries) => void persist({ ...content, [section]: entries } as PortfolioContent)} />}
       </div>
     </div>
   </main>;
 }
 
+function EditorAccessForm() {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function grantAccess(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
+
+    setBusy(true);
+    try {
+      const { error } = await supabase.rpc("invite_portfolio_admin", { target_email: normalizedEmail });
+      if (error) throw error;
+      toast.success("Editor access is set. They can sign in with this email or Google.");
+      setEmail("");
+    } catch {
+      toast.error("Access could not be granted. Confirm you are an administrator and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="max-w-2xl rounded-2xl border border-border bg-card p-6 sm:p-8">
+      <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><UserPlus /></div>
+      <h2 className="mt-5 editorial-title text-3xl">Give a trusted editor access.</h2>
+      <p className="mt-3 max-w-xl leading-7 text-muted-foreground">Add their email address to let them manage this portfolio. Existing confirmed accounts get access immediately; new accounts get access after confirming their email.</p>
+      <form onSubmit={grantAccess} className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <label className="mb-2 block text-sm font-medium" htmlFor="editor-email">Editor email</label>
+          <Input id="editor-email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="editor@example.com" />
+        </div>
+        <Button type="submit" disabled={busy} className="rounded-full sm:min-w-40">
+          {busy ? <LoaderCircle className="animate-spin" /> : <UserPlus />}
+          {busy ? "Granting access…" : "Grant access"}
+        </Button>
+      </form>
+      <p className="mt-4 text-xs leading-5 text-muted-foreground">Only an existing portfolio administrator can grant access. After access is granted, the editor should sign out and sign in again if they already had a session.</p>
+    </section>
+  );
+}
+
 function ArrowRightSmall() { return <ChevronRight className="size-4" />; }
 async function queryClientInvalidate() { await import("@/integrations/supabase/client").then(() => undefined); }
 
-function Overview({ counts, onSelect, content }: { counts: Record<string, number>; onSelect: (key: SectionKey) => void; content: PortfolioContent }) {
-  const cards = [{ key: "projects", label: "Projects", count: counts.projects, icon: FolderKanban }, { key: "skillCategories", label: "Technologies", count: counts.skills, icon: Sparkles }, { key: "experiences", label: "Experience", count: counts.experience, icon: BriefcaseBusiness }, { key: "achievements", label: "Achievements", count: counts.achievements, icon: ShieldCheck }] as const;
-  return <div className="space-y-8"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <button key={card.key} type="button" onClick={() => onSelect(card.key)} className="rounded-2xl border border-border bg-card p-5 text-left transition hover:border-rose/40 hover:shadow-md"><card.icon className="size-5 text-rose" /><p className="mt-5 font-mono text-xs uppercase tracking-widest text-muted-foreground">{card.label}</p><p className="mt-2 editorial-title text-5xl">{card.count}</p><p className="mt-3 flex items-center gap-1 text-xs text-rose">Manage {card.label.toLowerCase()}<ChevronRight className="size-3" /></p></button>)}</div><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-border bg-card p-6"><p className="font-mono text-xs uppercase tracking-widest text-rose">Portfolio status</p><div className="mt-5 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-full bg-green-100 text-green-800"><Check className="size-5" /></span><div><p className="font-semibold">Live content is ready</p><p className="mt-1 text-xs text-muted-foreground">Your profile and project details are saved online.</p></div></div><Button variant="outline" className="mt-6 w-full rounded-full" onClick={() => onSelect("profile")}>Review your profile</Button></div><div className="rounded-2xl border border-border bg-card p-6"><p className="font-mono text-xs uppercase tracking-widest text-rose">Profile snapshot</p><div className="mt-5 flex items-center gap-4"><img src={content.profile.portraitUrl} alt="Your portfolio portrait" className="size-16 rounded-full object-cover" /><div><p className="font-semibold">{content.profile.fullName}</p><p className="text-sm text-muted-foreground">{content.profile.title}</p><p className="mt-1 text-xs text-muted-foreground">{content.profile.location}</p></div></div></div></div></div>;
+function Overview({ counts, onSelect, content }: { counts: { projects: number; skills: number; experience: number; achievements: number }; onSelect: (key: SectionKey) => void; content: PortfolioContent }) {
+  const cards = [{ key: "projects", label: "Projects", count: counts["projects"], icon: FolderKanban }, { key: "skillCategories", label: "Technologies", count: counts["skills"], icon: Sparkles }, { key: "experiences", label: "Experience", count: counts["experience"], icon: BriefcaseBusiness }, { key: "achievements", label: "Achievements", count: counts["achievements"], icon: ShieldCheck }] as const;
+  const profile = content["profile"];
+  return <div className="space-y-8"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <button key={card.key} type="button" onClick={() => onSelect(card.key)} className="rounded-2xl border border-border bg-card p-5 text-left transition hover:border-rose/40 hover:shadow-md"><card.icon className="size-5 text-rose" /><p className="mt-5 font-mono text-xs uppercase tracking-widest text-muted-foreground">{card.label}</p><p className="mt-2 editorial-title text-5xl">{card.count}</p><p className="mt-3 flex items-center gap-1 text-xs text-rose">Manage {card.label.toLowerCase()}<ChevronRight className="size-3" /></p></button>)}</div><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-border bg-card p-6"><p className="font-mono text-xs uppercase tracking-widest text-rose">Portfolio status</p><div className="mt-5 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-full bg-green-100 text-green-800"><Check className="size-5" /></span><div><p className="font-semibold">Live content is ready</p><p className="mt-1 text-xs text-muted-foreground">Your profile and project details are saved online.</p></div></div><Button variant="outline" className="mt-6 w-full rounded-full" onClick={() => onSelect("profile")}>Review your profile</Button></div><div className="rounded-2xl border border-border bg-card p-6"><p className="font-mono text-xs uppercase tracking-widest text-rose">Profile snapshot</p><div className="mt-5 flex items-center gap-4"><img src={profile.portraitUrl} alt="Your portfolio portrait" className="size-16 rounded-full object-cover" /><div><p className="font-semibold">{profile.fullName}</p><p className="text-sm text-muted-foreground">{profile.title}</p><p className="mt-1 text-xs text-muted-foreground">{profile.location}</p></div></div></div></div></div>;
 }
 
 function ProfileEditor({ profile, saving, onSave }: { profile: ProfileContent; saving: boolean; onSave: (profile: ProfileContent) => void }) {
@@ -184,7 +229,7 @@ function SocialLinksEditor({ links, onChange }: { links: ProfileContent["socialL
 type FieldProps = { label: string; children: React.ReactNode };
 function Field({ label, children }: FieldProps) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
 
-const fieldsByCollection: Record<Exclude<SectionKey,"overview"|"profile"|"appearance"|"skillCategories">, string[]> = {
+const fieldsByCollection: Record<CollectionSectionKey, string[]> = {
   experiences: ["role","company","dates","location","responsibilities"],
   education: ["degree","institution","dates","location","details"],
   projects: ["title","slug","category","description","fullDescription","problem","features","screenshots","technologies","learnings","imageUrl","projectUrl","githubUrl","featured","published"],
@@ -199,20 +244,20 @@ const templates: Partial<Record<PortfolioCollectionName, PortfolioEntry>> = {
   tools: { name:"",category:"Development",icon:"Wrench" },
 };
 
-function CollectionEditor({ collection, entries, saving, onSave }: { collection: Exclude<SectionKey,"overview"|"profile"|"appearance"|"skillCategories">; entries: PortfolioEntry[]; saving: boolean; onSave: (entries: PortfolioEntry[]) => void }) {
+function CollectionEditor({ collection, entries, saving, onSave }: { collection: CollectionSectionKey; entries: PortfolioEntry[]; saving: boolean; onSave: (entries: PortfolioEntry[]) => void }) {
   const fields = fieldsByCollection[collection];
   const [draft, setDraft] = useState(() => structuredClone(entries));
   const [open, setOpen] = useState<number | null>(draft.length ? 0 : null);
   const [filter, setFilter] = useState("");
-  const shown = useMemo(() => draft.map((row,i) => ({row,i})).filter(({row}) => JSON.stringify(row).toLowerCase().includes(filter.toLowerCase())), [draft,filter]);
+  const shown = useMemo(() => draft.map((row, index) => ({ row, index })).filter(({ row }) => JSON.stringify(row).toLowerCase().includes(filter.toLowerCase())), [draft,filter]);
   function patch(index: number, key: string, value: string | boolean | string[]) { setDraft((p) => p.map((v,i) => i === index ? { ...v,[key]:value } : v)); }
   function add() { setDraft((p) => [...p, structuredClone(templates[collection] ?? {})]); setOpen(draft.length); setFilter(""); }
-  function move(index: number, direction: -1 | 1) { setDraft((p) => { const next = [...p]; const to = index + direction; if (to < 0 || to >= next.length) return p; [next[index],next[to]] = [next[to],next[index]]; return next; }); setOpen(index + direction); }
+  function move(index: number, direction: -1 | 1) { setDraft((p) => { const next = [...p]; const to = index + direction; if (to < 0 || to >= next.length) return p; const current = next[index]; const target = next[to]; if (!current || !target) return p; next[index] = target; next[to] = current; return next; }); setOpen(index + direction); }
   const heading = navItems.find((x) => x.key === collection)?.label ?? "Content";
 
   return <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4"><div><p className="font-semibold">{draft.length} {heading.toLowerCase()} {draft.length === 1 ? "entry" : "entries"}</p><p className="mt-1 text-xs text-muted-foreground">Drag-free ordering with position controls.</p></div><div className="flex gap-2"><Input aria-label={`Search ${heading.toLowerCase()}`} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find an entry" className="max-w-40" /><Button onClick={add} className="rounded-full"><Plus />Add {heading.replace(/s$/, "")}</Button></div></div>
     {!shown.length && <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-12 text-center"><FileImage className="mx-auto size-8 text-rose" /><p className="mt-4 font-medium">{filter ? "No matching entries." : `No ${heading.toLowerCase()} yet.`}</p><p className="mt-2 text-sm text-muted-foreground">{filter ? "Try a different search." : "Add your first entry when you are ready."}</p>{!filter && <Button className="mt-5 rounded-full" onClick={add}><Plus />Add an entry</Button>}</div>}
-    {shown.map(({row,index}) => <article key={`${collection}-${index}`} className="overflow-hidden rounded-2xl border border-border bg-card"><div className="flex items-center gap-2 p-3 sm:p-4"><button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setOpen(open === index ? null : index)}><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-blush font-mono text-xs text-rose">{String(index + 1).padStart(2,"0")}</span><span className="min-w-0"><span className="block truncate font-semibold">{firstString(row, fields[0]) || `Untitled ${heading.replace(/s$/,"")}`}</span><span className="block truncate text-xs text-muted-foreground">{firstString(row, fields[1])}</span></span></button><Button size="icon" variant="ghost" aria-label="Move entry up" disabled={index === 0} onClick={() => move(index,-1)}><ArrowUp /></Button><Button size="icon" variant="ghost" aria-label="Move entry down" disabled={index === draft.length-1} onClick={() => move(index,1)}><ArrowDown /></Button><Button size="icon" variant="ghost" aria-label="Remove entry" onClick={() => { setDraft((p)=>p.filter((_,i)=>i!==index)); setOpen(null); }}><Trash2 className="text-destructive" /></Button></div>{open === index && <div className="grid gap-4 border-t border-border p-5 sm:grid-cols-2">{fields.map((key) => <EntryField key={key} field={key} value={row[key]} onChange={(v) => patch(index,key,v)} />)}</div>}</article>)}
+    {shown.map(({row,index}) => <article key={`${collection}-${index}`} className="overflow-hidden rounded-2xl border border-border bg-card"><div className="flex items-center gap-2 p-3 sm:p-4"><button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setOpen(open === index ? null : index)}><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-blush font-mono text-xs text-rose">{String(index + 1).padStart(2,"0")}</span><span className="min-w-0"><span className="block truncate font-semibold">{firstString(row, fields[0] ?? "title") || `Untitled ${heading.replace(/s$/,"")}`}</span><span className="block truncate text-xs text-muted-foreground">{firstString(row, fields[1] ?? "description")}</span></span></button><Button size="icon" variant="ghost" aria-label="Move entry up" disabled={index === 0} onClick={() => move(index,-1)}><ArrowUp /></Button><Button size="icon" variant="ghost" aria-label="Move entry down" disabled={index === draft.length-1} onClick={() => move(index,1)}><ArrowDown /></Button><Button size="icon" variant="ghost" aria-label="Remove entry" onClick={() => { setDraft((p)=>p.filter((_,i)=>i!==index)); setOpen(null); }}><Trash2 className="text-destructive" /></Button></div>{open === index && <div className="grid gap-4 border-t border-border p-5 sm:grid-cols-2">{fields.map((key) => <EntryField key={key} field={key} value={row[key]} onChange={(v) => patch(index,key,v)} />)}</div>}</article>)}
     <SaveBar saving={saving} onSave={() => onSave(draft)} /></div>;
 }
 
