@@ -14,6 +14,8 @@ export const portfolioQuery = queryOptions({ queryKey: ["portfolio"], queryFn: (
 const title = "Queen-Esther Ezinne Emeanua | Software Engineer";
 const description =
   "Explore the portfolio of Queen-Esther Ezinne Emeanua, a software engineering undergraduate passionate about software development, product design, and building impactful digital experiences.";
+const portraitFallbackUrl =
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/5916341A-6E50-40F9-9BE1-92BF72B7F868-BzfbpM541Lx6JkaIMOCTtUeT5zVuw9.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -43,6 +45,7 @@ function Index() {
 
 function Portfolio({ content }: { content: PortfolioContent }) {
   const { profile: p, settings: s } = content;
+  const portraitUrl = p.portraitUrl.startsWith("/__l5e/") ? portraitFallbackUrl : p.portraitUrl;
   const show = (k: string) => s.visibleSections?.[k] !== false;
   const [open, setOpen] = useState(false);
   const [first, ...rest] = p.fullName.split(" ");
@@ -96,7 +99,7 @@ function Portfolio({ content }: { content: PortfolioContent }) {
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Currently</p>
                 <p className="mt-1 text-sm font-semibold">Software Engineering · PAU</p>
               </div>
-              <img src={p.portraitUrl} alt={`Portrait of ${p.fullName}`} className="aspect-[4/5] w-full rounded-[48%_48%_2rem_2rem] object-cover shadow-2xl" style={{ objectPosition: `${p.portraitPosition?.[0] ?? 50}% ${p.portraitPosition?.[1] ?? 45}%` }} fetchPriority="high" />
+              <img src={portraitUrl} alt={`Portrait of ${p.fullName}`} className="aspect-[4/5] w-full rounded-[48%_48%_2rem_2rem] object-cover shadow-2xl" style={{ objectPosition: `${p.portraitPosition?.[0] ?? 50}% ${p.portraitPosition?.[1] ?? 45}%` }} fetchPriority="high" />
             </div>
           </div>
           <div className="mx-auto max-w-7xl px-5 pb-10 lg:px-8">
