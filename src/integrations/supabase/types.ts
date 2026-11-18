@@ -95,6 +95,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      list_portfolio_users: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string | null
+          email: string
+          email_confirmed_at: string | null
+          has_invite: boolean
+          is_admin: boolean
+          last_sign_in_at: string | null
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
