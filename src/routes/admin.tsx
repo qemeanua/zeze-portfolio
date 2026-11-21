@@ -1,13 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowLeft, ArrowUp, BriefcaseBusiness, Check, ChevronRight, FileImage, FileText, FolderKanban, GraduationCap, ImagePlus, LayoutDashboard, LoaderCircle, LogOut, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2, UserPlus, UserRound, UsersRound, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
 import { PortfolioIcon } from "@/components/portfolio/icons";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { portfolioQuery } from "@/routes/index";
 import type { AchievementEntry, EducationEntry, ExperienceEntry, PortfolioCollectionName, PortfolioContent, PortfolioEntry, ProfileContent, ProjectEntry, SkillCategory, SkillEntry, ToolEntry } from "@/lib/portfolio-types";
@@ -82,7 +85,7 @@ function AdminPage() {
   }, []);
 
   async function persist(next: PortfolioContent, success = "Changes saved.") {
-    if (!isAdmin) { toast.error("Only the verified portfolio owner can save changes."); return; }
+    if (!isAdmin) { toast.error("Only a verified portfolio administrator can save changes."); return; }
     setSaving(true);
     try {
       const serialized = JSON.stringify(next);
@@ -123,44 +126,117 @@ function AdminPage() {
   </main>;
 }
 
+async function fetchPortfolioUsers() {
+  const { data, error } = await supabase.rpc("list_portfolio_users");
+  if (error) throw error;
+  return data ?? [];
+}
+
+type PortfolioUser = Awaited<ReturnType<typeof fetchPortfolioUsers>>[number];
+const EMPTY_PORTFOLIO_USERS: PortfolioUser[] = [];
+
 function EditorAccessForm() {
   const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [grantingEmail, setGrantingEmail] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const usersQuery = useQuery({ queryKey: ["portfolio-users"], queryFn: fetchPortfolioUsers });
+  const users = usersQuery.data ?? EMPTY_PORTFOLIO_USERS;
+  const filteredUsers = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return normalizedSearch ? users.filter((user) => user.email.toLowerCase().includes(normalizedSearch)) : users;
+  }, [search, users]);
 
-  async function grantAccess(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) return;
-
-    setBusy(true);
+  async function grantEmailAccess(targetEmail: string) {
+    const normalizedEmail = targetEmail.trim().toLowerCase();
+    setGrantingEmail(normalizedEmail);
     try {
       const { error } = await supabase.rpc("invite_portfolio_admin", { target_email: normalizedEmail });
       if (error) throw error;
-      toast.success("Editor access is set. They can sign in with this email or Google.");
-      setEmail("");
+      await queryClient.invalidateQueries({ queryKey: ["portfolio-users"] });
+      toast.success("Access is enabled for confirmed accounts; new accounts get access after email confirmation.");
+      return true;
     } catch {
       toast.error("Access could not be granted. Confirm you are an administrator and try again.");
+      return false;
     } finally {
-      setBusy(false);
+      setGrantingEmail(null);
     }
   }
 
+  async function submitInvite(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!email.trim()) return;
+    if (await grantEmailAccess(email)) setEmail("");
+  }
+
   return (
-    <section className="max-w-2xl rounded-2xl border border-border bg-card p-6 sm:p-8">
+    <section className="max-w-5xl rounded-2xl border border-border bg-card p-6 sm:p-8">
       <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><UserPlus /></div>
       <h2 className="mt-5 editorial-title text-3xl">Give a trusted editor access.</h2>
-      <p className="mt-3 max-w-xl leading-7 text-muted-foreground">Add their email address to let them manage this portfolio. Existing confirmed accounts get access immediately; new accounts get access after confirming their email.</p>
-      <form onSubmit={grantAccess} className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end">
+      <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">Choose a registered account below to grant access immediately. You can also preapprove an email; the account becomes an admin after it is created and verified.</p>
+      <form onSubmit={submitInvite} className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="mb-2 block text-sm font-medium" htmlFor="editor-email">Editor email</label>
+          <label className="mb-2 block text-sm font-medium" htmlFor="editor-email">Preapprove an email</label>
           <Input id="editor-email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="editor@example.com" />
         </div>
-        <Button type="submit" disabled={busy} className="rounded-full sm:min-w-40">
-          {busy ? <LoaderCircle className="animate-spin" /> : <UserPlus />}
-          {busy ? "Granting access…" : "Grant access"}
+        <Button type="submit" disabled={grantingEmail !== null} className="rounded-full sm:min-w-40">
+          {grantingEmail ? <LoaderCircle className="animate-spin" /> : <UserPlus />}
+          {grantingEmail ? "Saving invite…" : "Save invite"}
         </Button>
       </form>
-      <p className="mt-4 text-xs leading-5 text-muted-foreground">Only an existing portfolio administrator can grant access. After access is granted, the editor should sign out and sign in again if they already had a session.</p>
+
+      <div className="mt-10 border-t border-border pt-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Registered accounts</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Up to 250 recent accounts from this project. Failed sign-in attempts are not included.</p>
+          </div>
+          <div className="w-full sm:max-w-xs">
+            <label className="mb-2 block text-sm font-medium" htmlFor="account-search">Search by email</label>
+            <Input id="account-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="name@example.com" />
+          </div>
+        </div>
+
+        {usersQuery.isPending ? <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground" role="status"><LoaderCircle className="size-4 animate-spin" />Loading registered accounts…</div> : usersQuery.isError ? <div className="mt-6 rounded-xl border border-border p-5"><p className="text-sm text-muted-foreground">Accounts could not be loaded.</p><Button variant="outline" size="sm" className="mt-3" onClick={() => void usersQuery.refetch()}>Try again</Button></div> : filteredUsers.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">{users.length === 0 ? "No registered accounts were found in this Supabase project." : "No accounts match that email."}</p> : (
+          <div className="mt-5 rounded-xl border border-border">
+            <Table>
+              <TableCaption>Accounts are visible to portfolio admins only.</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Account status</TableHead>
+                  <TableHead>Access</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Last sign-in</TableHead>
+                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user: PortfolioUser) => {
+                  const status = user.is_admin ? "Admin" : user.has_invite && !user.email_confirmed_at ? "Awaiting verification" : user.has_invite ? "Invite saved" : "No access";
+                  return (
+                    <TableRow key={user.user_id}>
+                      <TableCell className="font-medium">{user.email}</TableCell>
+                      <TableCell><Badge variant={user.email_confirmed_at ? "secondary" : "outline"}>{user.email_confirmed_at ? "Verified" : "Needs verification"}</Badge></TableCell>
+                      <TableCell><Badge variant={user.is_admin ? "default" : "outline"}>{status}</Badge></TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">{user.created_at ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(user.created_at)) : "Unknown"}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">{user.last_sign_in_at ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(user.last_sign_in_at)) : "Never"}</TableCell>
+                      <TableCell className="text-right">
+                        <Button type="button" size="sm" variant={user.is_admin ? "secondary" : "outline"} disabled={user.is_admin || grantingEmail !== null} onClick={() => void grantEmailAccess(user.email)}>
+                          {grantingEmail === user.email ? <LoaderCircle className="animate-spin" /> : user.is_admin ? <Check /> : <UserPlus />}
+                          {user.is_admin ? "Admin" : user.has_invite ? "Grant again" : "Grant admin"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">The account list is private to administrators. If an account already has a session, ask its user to sign out and back in after access is granted.</p>
+      </div>
     </section>
   );
 }
